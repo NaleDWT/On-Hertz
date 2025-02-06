@@ -6,26 +6,26 @@ import vueDevTools from "vite-plugin-vue-devtools";
 
 // https://vite.dev/config/
 export default defineConfig({
-	plugins: [
-		vue({
-			template: {
-				compilerOptions: {
-					isCustomElement: (tag) => tag.startsWith("oh-"),
-				},
-			},
-		}),
-		vueDevTools(),
-	],
-	resolve: {
-		alias: {
-			"@": fileURLToPath(new URL("./src", import.meta.url)),
-		},
-	},
-	css: {
-		preprocessorOptions: {
-			scss: {
-				api: "modern-compiler",
-			},
-		},
-	},
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith("oh-"),
+        },
+      },
+    }),
+    vueDevTools(),
+  ],
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: "modern-compiler",
+      },
+    },
+  },
 });
