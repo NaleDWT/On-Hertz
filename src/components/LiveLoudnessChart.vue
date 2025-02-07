@@ -2,37 +2,34 @@
 import { ref, watch, onMounted, nextTick } from "vue";
 import * as d3 from "d3";
 import { interpolateString } from "d3-interpolate";
-
-// Props depuis `App.vue`
+import interact from "interactjs";
 const props = defineProps<{
   instantLUFS: number | null;
   instantRMS: number | null;
   audioSrc: string;
 }>();
 
-// Stockage des valeurs lissées
 const smoothedLUFS = ref(0);
 const smoothedRMS = ref(0);
 const smoothingFactor = 0.2;
 
-// Stockage des données
 const data = ref<{ time: number; lufs: number; rms: number }[]>([]);
 const chartRef = ref<SVGSVGElement | null>(null);
 const timeScale = ref(10);
 const width = 400,
   height = 300;
 
-const timelineDuration = ref(120); // ⏳ Durée totale de la timeline (par ex. 120s)
-const viewOffset = ref(0); // 🔄 Déplacement indépendant (scroll de la timeline)
-const isAutoScrolling = ref(true); // 🛑 Indique si on suit en temps réel ou si on navigue
+const timelineDuration = ref(120);
+const viewOffset = ref(0);
+const isAutoScrolling = ref(true);
 const tooltip = ref<HTMLElement | null>(null);
 const histogramRef = ref<SVGSVGElement | null>(null);
 const levelMeterRef = ref<SVGSVGElement | null>(null);
 const momentaryMax = ref(0);
 const shortTermMax = ref(0);
 const truePeakMax = ref(0);
+const liveLoudnessContainer = ref<HTMLDivElement | null>(null);
 
-// D3.js
 let svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
 let xScale: d3.ScaleLinear<number, number>;
 let yScale: d3.ScaleLinear<number, number>;
@@ -40,20 +37,17 @@ let lineLUFS: d3.Line<{ time: number; lufs: number }>;
 let lineRMS: d3.Line<{ time: number; rms: number }>;
 let areaRMS: d3.Area<{ time: number; rms: number }>;
 
-// Déclaration des variables globales pour éviter les erreurs TypeScript
 let xAxis: d3.Axis<d3.NumberValue>;
 let yAxis: d3.Axis<d3.NumberValue>;
 let xAxisGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
 let yAxisGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
 
-// Gestion du temps
 let internalTime = 0;
 let lastUpdateTime = 0;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let animationFrameId: number | null = null;
 let isAnimating = false;
 
-// Fonction de lissage (moyenne exponentielle)
 const smoothValue = (
   current: number,
   newValue: number | null,
@@ -64,7 +58,6 @@ const smoothValue = (
     : current;
 };
 
-// Ajouter une mesure LUFS & RMS
 const addDataPoint = () => {
   if (props.instantLUFS === null && props.instantRMS === null) {
     if (intervalId) {
@@ -105,12 +98,8 @@ const addDataPoint = () => {
     lufs: smoothedLUFS.value,
     rms: smoothedRMS.value,
   });
-
-  // const cutoff = internalTime - timeScale.value * 1000;
-  // data.value = data.value.filter((d) => d.time >= cutoff);
 };
 
-// Démarrer ou stopper `setInterval()` en fonction de LUFS/RMS
 watch(
   [() => props.instantLUFS, () => props.instantRMS],
   ([newLUFS, newRMS]) => {
@@ -128,37 +117,35 @@ watch(
   }
 );
 const moveRectangleToClick = (event: MouseEvent) => {
-  if (!histogramRef.value || internalTime < timeScale.value * 1000) return; // 🔥 Bloque l'interaction avant 5s, 10s ou 30s
+  if (!histogramRef.value || internalTime < timeScale.value * 1000) return;
 
   const containerWidth = histogramRef.value.clientWidth || 400;
   const rect = d3.select(histogramRef.value).select(".draggable-rect");
   const rectWidth = parseFloat(rect.attr("width"));
 
   const clickX = event.offsetX;
-  let newX = clickX - rectWidth / 2; // ✅ Centrer correctement
+  let newX = clickX - rectWidth / 2;
 
   newX = Math.max(0, Math.min(newX, containerWidth - rectWidth));
 
   rect.attr("x", newX);
 
-  // ✅ Synchroniser le scroll avec le rectangle après le clic
   const proportion = newX / (containerWidth - rectWidth);
   viewOffset.value = proportion * (internalTime - timeScale.value * 1000);
 
-  isAutoScrolling.value = false; // ✅ Activer le mode pause & scroll au clic
+  isAutoScrolling.value = false;
 };
 
-const dragOffset = ref(0); // 🔥 Stocker l'offset pour bien centrer le curseur
+const dragOffset = ref(0);
 
 const dragStarted = (
   event: d3.D3DragEvent<SVGRectElement, unknown, unknown>
 ) => {
-  if (internalTime < timeScale.value * 1000) return; // 🔥 Bloque le début du drag
+  if (internalTime < timeScale.value * 1000) return;
 
-  isAutoScrolling.value = false; // ✅ Désactiver l'auto-scroll
+  isAutoScrolling.value = false;
   const rect = d3.select(event.sourceEvent.target as SVGRectElement);
 
-  // 🔥 Calculer l'offset entre le curseur et le bord gauche du rectangle
   const rectX = parseFloat(rect.attr("x"));
   dragOffset.value = event.x - rectX;
 
@@ -166,8 +153,8 @@ const dragStarted = (
 };
 
 const dragged = (event: d3.D3DragEvent<SVGRectElement, unknown, unknown>) => {
-  if (!histogramRef.value) return; // ✅ Évite l'erreur si l'élément n'est pas encore monté
-  if (internalTime < timeScale.value * 1000) return; // 🔥 Bloque le déplacement
+  if (!histogramRef.value) return;
+  if (internalTime < timeScale.value * 1000) return;
 
   const rect = d3.select(event.sourceEvent.target as SVGRectElement);
   const containerWidth = histogramRef.value.clientWidth || 400;
@@ -186,21 +173,19 @@ const dragEnded = (event: d3.D3DragEvent<SVGRectElement, unknown, unknown>) => {
   d3.select(event.sourceEvent.target).attr("cursor", "grab");
 };
 
-// Initialisation du graphique D3.js
 const initChart = async () => {
   await nextTick();
   if (!chartRef.value) return;
 
   svg = d3.select(chartRef.value).attr("width", width).attr("height", height);
-  // Définition du clipPath pour masquer les bords gauche et droit
   svg
     .append("defs")
     .append("clipPath")
     .attr("id", "clip")
     .append("rect")
-    .attr("width", width - 10) // Ajuste pour masquer le début et la fin
+    .attr("width", width - 10)
     .attr("height", height)
-    .attr("x", 5) // Décale pour éviter de cacher trop au début
+    .attr("x", 5)
     .attr("y", 0);
 
   xAxisGroup = svg
@@ -217,12 +202,12 @@ const initChart = async () => {
   xScale = d3
     .scaleLinear()
     .domain([0, timelineDuration.value * 1000])
-    .range([0, width * (timelineDuration.value / timeScale.value)]); // 🔍 Ajuste à la plage visible
+    .range([0, width * (timelineDuration.value / timeScale.value)]);
 
   xScale = d3
     .scaleLinear()
     .domain([internalTime - timeScale.value * 1000, internalTime])
-    .range([0, width]); // ✅ Utilise toute la largeur
+    .range([0, width]);
 
   yScale = d3.scaleLinear().domain([-30, 30]).range([height, 0]);
 
@@ -239,7 +224,7 @@ const initChart = async () => {
     .ticks(10)
     .tickSize(0)
     .tickFormat((d) => {
-      const allowedTicks = [25, 20, 10, 0, -15, -30]; // ✅ Valeurs autorisées
+      const allowedTicks = [25, 20, 10, 0, -15, -30];
       return allowedTicks.includes(Number(d))
         ? `${Math.round(Number(d))} dB`
         : "";
@@ -252,27 +237,26 @@ const initChart = async () => {
 
   yAxisGroup.call(yAxis);
 
-  // Sélectionner les ticks visibles et ajouter une ligne horizontale
   yAxisGroup
     .selectAll(".tick")
     .filter(function () {
       const tickText = d3.select(this).select("text").text();
-      return tickText !== ""; // ✅ Ne prend que les ticks qui ont du texte visible
+      return tickText !== "";
     })
     .append("line")
     .attr("x1", 15)
-    .attr("x2", width) // 🔥 Étend sur toute la largeur
-    .attr("stroke", "#ffffff1e") // 🎨 Couleur des lignes
+    .attr("x2", width)
+    .attr("stroke", "#ffffff1e")
     .attr("stroke-width", 1);
 
   yAxisGroup.select(".domain").style("stroke", "none");
   yAxisGroup
     .selectAll("text")
-    .style("font-size", "12px") // ✅ Change la taille ici
-    .style("fill", "white"); // ✅ Facultatif : changer la couleur
+    .style("font-size", "12px")
+    .style("fill", "white");
   xAxisGroup
     .selectAll("text")
-    .style("font-size", "12px") // ✅ Change la taille ici
+    .style("font-size", "12px")
     .style("fill", "white");
 
   areaRMS = d3
@@ -297,7 +281,7 @@ const initChart = async () => {
     .append("path")
     .attr("class", "rms-area")
     .attr("fill", "#b030b080")
-    .attr("clip-path", "url(#clip)"); // 🔥 Applique le clipPath
+    .attr("clip-path", "url(#clip)");
 
   svg
     .append("path")
@@ -305,7 +289,7 @@ const initChart = async () => {
     .attr("fill", "none")
     .attr("stroke", "#f2f2f3")
     .attr("stroke-width", 2)
-    .attr("clip-path", "url(#clip)"); // 🔥 Applique le clipPath
+    .attr("clip-path", "url(#clip)");
 
   svg
     .append("path")
@@ -313,8 +297,8 @@ const initChart = async () => {
     .attr("fill", "none")
     .attr("stroke", "#b030b0")
     .attr("stroke-width", 2)
-    .attr("clip-path", "url(#clip)"); // 🔥 Applique le clipPath
-  // ✅ Ajouter une ligne verticale qui suit la souris
+    .attr("clip-path", "url(#clip)");
+
   const verticalLine = svg
     .append("line")
     .attr("class", "cursor-line")
@@ -322,9 +306,9 @@ const initChart = async () => {
     .attr("x2", 0)
     .attr("y1", 0)
     .attr("y2", height)
-    .attr("stroke", "#05c17f") // 🎨 Couleur semi-transparente
+    .attr("stroke", "#05c17f")
     .attr("stroke-width", 1.2)
-    .attr("display", "none"); // ❌ Cachée par défaut
+    .attr("display", "none");
 
   startAnimation();
 };
@@ -333,7 +317,6 @@ const initHistogram = async () => {
   await nextTick();
   if (!histogramRef.value) return;
 
-  // Récupérer la largeur et hauteur du parent
   const containerWidth = histogramRef.value.parentElement?.clientWidth || 400;
   const containerHeight = 32;
 
@@ -369,11 +352,10 @@ const initHistogram = async () => {
     .attr("stroke", "#f2f2f3")
     .attr("stroke-width", 2);
 
-  // ✅ Ajout du rectangle draggable
   histogramSvg
     .append("rect")
     .attr("class", "draggable-rect")
-    .attr("x", 0) // Position initiale au centre
+    .attr("x", 0)
     .attr("y", 0)
     .attr("width", 50)
     .attr("height", containerHeight)
@@ -391,76 +373,69 @@ const initLevelMeter = async () => {
   await nextTick();
   if (!levelMeterRef.value) return;
 
-  const meterWidth = 45; // Largeur du rectangle
+  const meterWidth = 45;
   const meterHeight = 200;
   const barWidth = 15;
   const spacing = 5;
-  const labelOffset = 0; // Décalage des labels à l'extérieur
+  const labelOffset = 0;
 
   const svg = d3
     .select(levelMeterRef.value)
-    .attr("width", meterWidth + 50) // Augmenté pour inclure la graduation
+    .attr("width", meterWidth + 50)
     .attr("height", meterHeight);
 
-  // Échelle Y pour représenter les valeurs LUFS et RMS
   const yScale = d3.scaleLinear().domain([-38, 27]).range([meterHeight, 0]);
 
-  // 📌 Valeurs des graduations en Y
   const tickValues = [-30, -15, 0, 10, 20, 25];
 
-  // 📌 Ajout des labels de graduation
   svg
     .selectAll(".tick-label")
     .data(tickValues)
     .enter()
     .append("text")
     .attr("class", "tick-label")
-    .attr("x", 16) // Placé à gauche du rectangle
-    .attr("y", (d) => yScale(d) + 5) // Centré verticalement
-    .attr("text-anchor", "end") // Aligné à droite
+    .attr("x", 16)
+    .attr("y", (d) => yScale(d) + 5)
+    .attr("text-anchor", "end")
     .attr("font-size", "12px")
     .attr("fill", "#ffffff")
     .text((d) => `${d}`);
 
-  // 📌 Ajout des barres horizontales pour chaque graduation
   svg
     .selectAll(".grid-line")
     .data(tickValues)
     .enter()
     .append("line")
     .attr("class", "grid-line")
-    .attr("x1", 24) // Position de départ avant la graduation
-    .attr("x2", 36) // Jusqu’au bout du rectangle
+    .attr("x1", 24)
+    .attr("x2", 36)
     .attr("y1", (d) => yScale(d))
     .attr("y2", (d) => yScale(d))
-    .attr("stroke", "#ffffff33") // Couleur semi-transparente
+    .attr("stroke", "#ffffff33")
     .attr("stroke-width", 1);
 
-  // 📌 Fond des barres (grand rectangle)
   svg
     .append("rect")
     .attr("class", "meter-bg")
-    .attr("x", 50) // Placé après la graduation
+    .attr("x", 50)
     .attr("y", 0)
     .attr("width", meterWidth)
     .attr("height", meterHeight)
     .attr("fill", "#10111d");
 
-  // 📌 Barre LUFS (orange) à gauche
   svg
     .append("rect")
     .attr("class", "lufs-bar")
-    .attr("x", 55) // Décalé après la graduation
+    .attr("x", 55)
     .attr("y", meterHeight)
     .attr("width", barWidth)
     .attr("height", 0)
     .attr("fill", "#05c17f");
 
-  // 📌 Barre RMS (bleu) à droite
   svg
     .append("rect")
     .attr("class", "rms-bar")
-    .attr("x", 55 + barWidth + spacing) // Décalé après la graduation
+    .attr("x", 55 + barWidth + spacing)
     .attr("y", meterHeight)
     .attr("width", barWidth)
     .attr("height", 0)
@@ -491,36 +466,31 @@ const updateLevelMeter = () => {
     .attr("height", rmsHeight);
 };
 let lastMetricUpdate = performance.now();
-const METRIC_UPDATE_INTERVAL = 2000; // Met à jour toutes les 2 secondes
+const METRIC_UPDATE_INTERVAL = 2000;
 
 const updateLoudnessMetrics = () => {
   const now = performance.now();
-  if (now - lastMetricUpdate < METRIC_UPDATE_INTERVAL) return; // Attendre 2 secondes avant MAJ
+  if (now - lastMetricUpdate < METRIC_UPDATE_INTERVAL) return;
   lastMetricUpdate = now;
 
   if (props.instantLUFS === null) return;
 
-  // Génération de valeurs réalistes avec variations plus lentes
-  momentaryMax.value += Math.random() * 1.5 - 0.75; // Petit ajustement progressif ±0.75 LUFS
-  shortTermMax.value += Math.random() * 1 - 0.5; // Petit ajustement ±0.5 LUFS
-  truePeakMax.value += Math.random() * 1 - 0.5; // Petit ajustement ±0.5 dBTP
-
-  // Limiter les valeurs minimales et maximales pour éviter les écarts irréalistes
+  momentaryMax.value += Math.random() * 1.5 - 0.75;
+  shortTermMax.value += Math.random() * 1 - 0.5;
+  truePeakMax.value += Math.random() * 1 - 0.5;
   momentaryMax.value = Math.min(Math.max(momentaryMax.value, -35), -10);
   shortTermMax.value = Math.min(Math.max(shortTermMax.value, -40), -12);
   truePeakMax.value = Math.min(Math.max(truePeakMax.value, -8), 0);
 };
 
-// Fonction pour démarrer l'animation `requestAnimationFrame()`
 const startAnimation = () => {
-  if (isAnimating) return; // ✅ Éviter les appels multiples
+  if (isAnimating) return;
   isAnimating = true;
   animateGraph();
 };
 
-// Fonction pour stopper l'animation `requestAnimationFrame()`
 const stopAnimation = () => {
-  if (!isAnimating) return; // ✅ Ne rien faire si déjà stoppé
+  if (!isAnimating) return;
   isAnimating = false;
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
@@ -532,26 +502,23 @@ const updateHistogram = () => {
   if (!histogramRef.value || data.value.length === 0) return;
 
   const containerWidth = histogramRef.value.clientWidth || 400;
-  const containerHeight = histogramRef.value.clientHeight || 100; // 🔥 Adapter à la taille réelle du SVG
+  const containerHeight = histogramRef.value.clientHeight || 100;
 
   const histogramSvg = d3.select(histogramRef.value);
 
   const firstTime = data.value[0]?.time ?? 0;
   const lastTime = data.value[data.value.length - 1]?.time ?? 1;
 
-  // 🔥 Assurer que l’échelle X prend bien toute la largeur de l'histogramme
   const histogramXScale = d3
     .scaleLinear()
     .domain([firstTime, lastTime])
     .range([0, containerWidth]);
 
-  // 🔥 Adapter l'échelle Y à la hauteur réelle du SVG
   const histogramYScale = d3
     .scaleLinear()
-    .domain([-30, 30]) // Garde la même plage de valeurs
-    .range([containerHeight, 0]); // 🔥 Ajusté à la taille réelle du SVG
+    .domain([-30, 30])
+    .range([containerHeight, 0]);
 
-  // 🔥 Met à jour l'affichage des données pour qu'elles remplissent bien tout l'histogramme
   histogramSvg
     .select(".histogram-area")
     .datum(data.value)
@@ -559,9 +526,9 @@ const updateHistogram = () => {
       "d",
       d3
         .area<{ time: number; rms: number }>()
-        .x((d) => histogramXScale(d.time)) // Étend les points sur toute la largeur
-        .y0(containerHeight) // 🔥 Ajuste la base des valeurs à la hauteur du SVG
-        .y1((d) => histogramYScale(d.rms)) // 🔥 Ajuste la hauteur des valeurs
+        .x((d) => histogramXScale(d.time))
+        .y0(containerHeight)
+        .y1((d) => histogramYScale(d.rms))
         .curve(d3.curveMonotoneX)
     );
 
@@ -572,8 +539,8 @@ const updateHistogram = () => {
       "d",
       d3
         .line<{ time: number; lufs: number }>()
-        .x((d) => histogramXScale(d.time)) // Étend les points sur toute la largeur
-        .y((d) => histogramYScale(d.lufs)) // 🔥 Ajuste la hauteur des valeurs
+        .x((d) => histogramXScale(d.time))
+        .y((d) => histogramYScale(d.lufs))
         .curve(d3.curveMonotoneX)
     );
 };
@@ -605,13 +572,12 @@ const animateGraph = () => {
 
   if (data.value.length === 0) return;
 
-  // ✅ L'axe X suit `viewOffset`
   xScale.domain([viewOffset.value, viewOffset.value + timeScale.value * 1000]);
 
   xAxisGroup.transition().duration(0).ease(d3.easeLinear).call(xAxis);
   xAxisGroup
     .selectAll("text")
-    .style("font-size", "12px") // ✅ Change la taille ici
+    .style("font-size", "12px")
     .style("fill", "white");
   svg.select(".rms-area").datum(data.value).attr("d", areaRMS);
   svg.select(".lufs-line").datum(data.value).attr("d", lineLUFS);
@@ -627,7 +593,7 @@ const togglePause = () => {
   if (isAutoScrolling.value) {
     viewOffset.value = internalTime - timeScale.value * 1000;
 
-    if (!histogramRef.value) return; // ✅ Vérification ajoutée
+    if (!histogramRef.value) return;
 
     const rect = d3.select(histogramRef.value).select(".draggable-rect");
     const containerWidth = histogramRef.value.clientWidth || 400;
@@ -644,11 +610,11 @@ const togglePause = () => {
 const handleScroll = (event: WheelEvent) => {
   if (!isAutoScrolling.value) {
     event.preventDefault();
-    viewOffset.value += event.deltaY * 10; // 🔄 Scroll plus rapide
+    viewOffset.value += event.deltaY * 10;
     viewOffset.value = Math.max(
       0,
       Math.min(viewOffset.value, internalTime - timeScale.value * 1000)
-    ); // 🛑 Limite aux données existantes
+    );
   }
 };
 
@@ -672,17 +638,13 @@ onMounted(() => {
 const handleMouseMove = (event: MouseEvent) => {
   if (!tooltip.value || !chartRef.value || data.value.length === 0) return;
 
-  // ✅ Récupérer la position X dans le SVG
   const svgRect = chartRef.value.getBoundingClientRect();
   const mouseX = event.clientX - svgRect.left;
 
-  // ✅ Convertir en secondes basées sur la timeline
   const timeAtCursor = xScale.invert(mouseX);
 
-  // ✅ Vérifier qu'il y a bien des données
   if (data.value.length === 0) return;
 
-  // ✅ Trouver les valeurs LUFS et RMS les plus proches
   const closestData =
     data.value.length > 1
       ? data.value.reduce((prev, curr) =>
@@ -693,7 +655,6 @@ const handleMouseMove = (event: MouseEvent) => {
         )
       : data.value[0];
 
-  // ✅ Mettre à jour le contenu du tooltip
   document.getElementById("tooltip-time")!.innerText = `POS: ${(
     timeAtCursor / 1000
   ).toFixed(1)}s`;
@@ -704,15 +665,13 @@ const handleMouseMove = (event: MouseEvent) => {
     "tooltip-rms"
   )!.innerText = `TP: ${closestData.rms.toFixed(2)}`;
 
-  // ✅ Afficher le tooltip
   tooltip.value.style.opacity = "1";
 
-  // ✅ Déplacer la ligne verticale
   svg
     .select(".cursor-line")
     .attr("x1", mouseX)
     .attr("x2", mouseX)
-    .attr("display", "block"); // 🔥 Rendre visible
+    .attr("display", "block");
 };
 
 const handleMouseLeave = () => {
@@ -731,10 +690,39 @@ onMounted(() => {
 });
 onMounted(initLevelMeter);
 onMounted(initChart);
+
+onMounted(() => {
+  if (!liveLoudnessContainer.value) return;
+
+  interact(".windowheader").draggable({
+    listeners: {
+      start(event) {},
+      move(event) {
+        const target = liveLoudnessContainer.value;
+        if (!target) return;
+
+        // Récupérer les positions actuelles
+        const x =
+          (parseFloat(target.getAttribute("data-x") || "0") || 0) + event.dx;
+        const y =
+          (parseFloat(target.getAttribute("data-y") || "0") || 0) + event.dy;
+
+        // Appliquer la transformation CSS pour déplacer le conteneur
+        target.style.transform = `translate(${x}px, ${y}px)`;
+
+        // Stocker la position pour l'utiliser lors des prochains déplacements
+        target.setAttribute("data-x", `${x}`);
+        target.setAttribute("data-y", `${y}`);
+      },
+      end(event) {},
+    },
+  });
+});
 </script>
 
 <template>
-  <div class="liveloudnesscontainer">
+  <div ref="liveLoudnessContainer" class="liveloudnesscontainer">
+    <div class="windowheader">Live Loudness Analyser</div>
     <div class="chartContainer">
       <svg
         class="chart"
@@ -744,7 +732,6 @@ onMounted(initChart);
       ></svg>
       <svg class="histogram" ref="histogramRef"></svg>
 
-      <!-- ✅ Tooltip FIXE en haut à droite -->
       <div ref="tooltip" class="tooltip">
         <p id="tooltip-time">POS: --s</p>
         <p id="tooltip-lufs">S: --</p>
@@ -808,209 +795,3 @@ onMounted(initChart);
     </div>
   </div>
 </template>
-
-<style scoped>
-.liveloudnesscontainer {
-  display: grid;
-  grid-template-columns: auto auto;
-  grid-template-rows: auto auto;
-}
-.chartContainer {
-  position: relative;
-  overflow: hidden;
-  background-color: #23253a;
-  border-radius: 8px 8px 0 0;
-}
-svg.chart {
-  margin: 0 12px 40px 64px;
-  overflow: visible;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-svg.histogram {
-  width: 100%;
-  padding: 0 16px;
-}
-
-.controls {
-  display: flex;
-  justify-content: space-between;
-  padding: 0 16px 16px;
-  background: #23253a;
-  border-radius: 0 0 8px 8px;
-  grid-column: 1;
-}
-button {
-  height: 32px;
-  width: 32px;
-  margin-left: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 4px;
-  background: #e1e1e4;
-  color: white;
-  cursor: pointer;
-}
-button:hover {
-  background: #7f819e;
-}
-button.disabled {
-  background: #2fb5d0;
-}
-button.disabled .buttonfill {
-  fill: #f2f2f3;
-}
-
-.tools__button {
-  display: flex;
-  align-items: center;
-}
-.tooltip {
-  position: absolute;
-  background: #161726d8;
-
-  top: 16px;
-  right: 16px;
-  color: white;
-  padding: 5px 15px;
-  border-radius: 5px;
-  font-size: 12px;
-  pointer-events: none;
-  opacity: 1;
-
-  z-index: 100;
-  transition: opacity 0.2s ease-in-out;
-}
-.x-axis path.domain {
-  stroke: none !important;
-  display: none !important;
-  d: none !important;
-}
-
-.draggable-rect {
-  stroke: white;
-  stroke-width: 1;
-}
-.draggable-rect.disabled {
-  pointer-events: none;
-  opacity: 0;
-}
-
-.custom-select-container {
-  display: flex;
-  flex-direction: column;
-  font-family: "Arial", sans-serif;
-  font-size: 14px;
-  color: #ccc;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-top: 8px;
-}
-
-.custom-select-wrapper {
-  position: relative;
-  width: 120px;
-}
-
-.custom-select {
-  appearance: none; /* Supprime le style natif */
-  background: #1c1e30;
-  border: none;
-  color: #ffffff;
-  font-size: 14px;
-  padding: 8px 12px;
-  width: 100%;
-  border-radius: 4px;
-  cursor: pointer;
-  outline: none;
-  transition: all 0.1s ease-in-out;
-}
-
-/* Ajout d'une icône de dropdown (flèche vers le bas) */
-.custom-select-wrapper::after {
-  content: "▼";
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 12px;
-  color: #afafaf;
-  pointer-events: none;
-}
-
-/* Effet au survol */
-.custom-select:hover {
-  border-color: #05c17f;
-  box-shadow: 0 0 5px #05c17f;
-}
-
-/* Effet au focus */
-.custom-select:focus {
-  border-color: #05c17f;
-  box-shadow: 0 0 5px #05c17f;
-}
-
-/* Style des options */
-.custom-select option {
-  background: #1c1e30;
-  color: #fff;
-  padding: 5px;
-  font-size: 14px;
-}
-
-.mastercontainer {
-  display: flex;
-  flex-direction: column-reverse;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: #161726d8;
-  border-radius: 0 8px 8px 0;
-  grid-row: 1 / span 2;
-  grid-column: 2;
-}
-
-svg.level-meter {
-  /* background: #1c1e30; */
-  border-radius: 4px;
-  padding: 8px 0;
-  overflow-x: visible;
-}
-
-.lufs-bar {
-  opacity: 0.7; /* Légère transparence pour voir RMS au-dessus */
-}
-
-.loudness-metrics {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  color: #ffffff;
-  font-size: 14px;
-  text-align: left;
-}
-
-.loudness-metrics li {
-  text-transform: uppercase;
-  text-align: justify;
-  align-items: center;
-  width: 100%;
-  font-size: 12px;
-  margin-bottom: 12px;
-  display: flex;
-  flex-direction: column;
-}
-.loudness-metrics span {
-  background-color: #23253a;
-  color: white;
-
-  text-align: center;
-  width: 100%;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  padding: 6px 12px;
-}
-</style>

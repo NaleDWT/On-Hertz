@@ -55,7 +55,11 @@ const onVolumeChange = (
       />
     </template>
     <template v-else>
-      <button @click="startAudioContext">Start</button>
+      <button @click="startAudioContext">
+        <svg width="13" height="14" viewBox="0 0 13 14" fill="none">
+          <path d="M0 14V0L12.6 7L0 14Z" fill="#161726" />
+        </svg>
+      </button>
     </template>
   </main>
 </template>
