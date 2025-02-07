@@ -36,11 +36,11 @@ const onVolumeChange = (
 <template>
   <main>
     <template v-if="audioContext">
-      <h2>{{ audioFiles[0].name }}</h2>
-      <h3>{{ audioFiles[0].author }}</h3>
+      <h2>{{ audioFiles[1].name }}</h2>
+      <h3>{{ audioFiles[1].author }}</h3>
       <oh-audio-player
         :audioContext="audioContext"
-        :src="audioFiles[0].path"
+        :src="audioFiles[1].path"
         @volume-change="onVolumeChange"
       ></oh-audio-player>
 
@@ -48,7 +48,11 @@ const onVolumeChange = (
         <div>RMS: {{ instantRMS }}</div>
         <div>LUFS: {{ instantLUFS }}</div>
       </div>
-      <LiveLoudnessChart :instantLUFS="instantLUFS" :instantRMS="instantRMS" />
+      <LiveLoudnessChart
+        :instantLUFS="instantLUFS"
+        :instantRMS="instantRMS"
+        :audioSrc="audioFiles[1].path"
+      />
     </template>
     <template v-else>
       <button @click="startAudioContext">Start</button>
