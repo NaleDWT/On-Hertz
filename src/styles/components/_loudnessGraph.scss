@@ -19,7 +19,6 @@
   position: relative;
   overflow: hidden;
   background-color: #23253a;
-  border-radius: 0px 8px 0 0;
   grid-row: 2;
   grid-column: 1;
 }
@@ -40,7 +39,7 @@ svg.histogram {
   justify-content: space-between;
   padding: 0 16px 16px;
   background: #23253a;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 0 8px;
   grid-row: 3;
 
   grid-column: 1;
@@ -50,13 +49,19 @@ button {
   width: 32px;
   margin-left: 8px;
   display: flex;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
   align-items: center;
   justify-content: center;
   border: none;
   border-radius: 4px;
   background: #e1e1e4;
-  color: white;
+  color: #1c1e30;
   cursor: pointer;
+}
+.startButton {
+  width: fit-content;
 }
 button:hover {
   background: #7f819e;
@@ -66,6 +71,35 @@ button.disabled {
 }
 button.disabled .buttonfill {
   fill: #f2f2f3;
+}
+
+.audioselect {
+  display: flex;
+  align-items: center;
+
+  div {
+    height: 54px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    background-color: #23253a;
+    border-radius: 8px;
+    margin-left: 16px;
+  }
+  button {
+    height: 32px;
+    width: 32px;
+
+    margin-left: 0px;
+
+    color: #000000;
+    font-size: 14px;
+    text-align: center;
+
+    &.prev {
+      margin-left: 8px;
+    }
+  }
 }
 
 .tools__button {
@@ -216,4 +250,11 @@ svg.level-meter {
   border-radius: 4px;
   margin-bottom: 8px;
   padding: 6px 12px;
+}
+
+.comment {
+  background-color: #1e1e1e;
+  color: #05c17f;
+  margin: 16px 0;
+  padding: 16px;
 }

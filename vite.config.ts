@@ -29,3 +29,34 @@ export default defineConfig({
     },
   },
 });
+
+// import { defineConfig } from "vite";
+// import vue from "@vitejs/plugin-vue";
+// import vueDevTools from "vite-plugin-vue-devtools";
+// import { fileURLToPath, URL } from "node:url";
+
+// export default defineConfig({
+//   base: "/projects/on-hertz-test/",
+//   plugins: [
+//     vue({
+//       template: {
+//         compilerOptions: {
+//           isCustomElement: (tag) => tag.startsWith("oh-"),
+//         },
+//       },
+//     }),
+//     vueDevTools(),
+//   ],
+//   resolve: {
+//     alias: {
+//       "@": fileURLToPath(new URL("./src", import.meta.url)),
+//     },
+//   },
+//   css: {
+//     preprocessorOptions: {
+//       scss: {
+//         api: "modern-compiler",
+//       },
+//     },
+//   },
+// });
