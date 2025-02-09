@@ -32,12 +32,10 @@ const audioFiles = [
   },
 ];
 
-// Démarrer l'AudioContext
 const startAudioContext = () => {
   audioContext.value = new AudioContext();
 };
 
-// Changer de piste
 const nextTrack = () => {
   currentIndex.value = (currentIndex.value + 1) % audioFiles.length;
   instantRMS.value = null;
@@ -51,7 +49,6 @@ const prevTrack = () => {
   instantLUFS.value = null;
 };
 
-// Gestion du volume
 const onVolumeChange = (
   e: CustomEvent<{ rms: number | null; lufs: number | null }>
 ) => {

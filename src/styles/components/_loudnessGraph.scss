@@ -154,7 +154,7 @@ button.disabled .buttonfill {
 }
 
 .custom-select {
-  appearance: none; /* Supprime le style natif */
+  appearance: none; 
   background: #1c1e30;
   border: none;
   color: #ffffff;
@@ -167,7 +167,6 @@ button.disabled .buttonfill {
   transition: all 0.1s ease-in-out;
 }
 
-/* Ajout d'une icône de dropdown (flèche vers le bas) */
 .custom-select-wrapper::after {
   content: "▼";
   position: absolute;
@@ -179,19 +178,16 @@ button.disabled .buttonfill {
   pointer-events: none;
 }
 
-/* Effet au survol */
 .custom-select:hover {
   border-color: #05c17f;
   box-shadow: 0 0 5px #05c17f;
 }
 
-/* Effet au focus */
 .custom-select:focus {
   border-color: #05c17f;
   box-shadow: 0 0 5px #05c17f;
 }
 
-/* Style des options */
 .custom-select option {
   background: #1c1e30;
   color: #fff;
@@ -206,20 +202,19 @@ button.disabled .buttonfill {
   align-items: center;
   padding: 16px;
   background: #161726d8;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 0px 8px 0;
   grid-row: 2 / span 2;
   grid-column: 2;
 }
 
 svg.level-meter {
-  /* background: #1c1e30; */
   border-radius: 4px;
   padding: 8px 0;
   overflow-x: visible;
 }
 
 .lufs-bar {
-  opacity: 0.7; /* Légère transparence pour voir RMS au-dessus */
+  opacity: 0.7;
 }
 
 .loudness-metrics {

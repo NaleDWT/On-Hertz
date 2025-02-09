@@ -545,7 +545,6 @@ const updateHistogram = () => {
     );
 };
 
-// Animation fluide
 const animateGraph = () => {
   if (!isAnimating) return;
 
@@ -676,9 +675,8 @@ const handleMouseMove = (event: MouseEvent) => {
 
 const handleMouseLeave = () => {
   if (!tooltip.value) return;
-  tooltip.value.style.opacity = "0"; // Cache le tooltip
+  tooltip.value.style.opacity = "0";
 
-  // ✅ Cacher la ligne verticale
   svg.select(".cursor-line").attr("display", "none");
 };
 onMounted(initHistogram);
@@ -701,16 +699,13 @@ onMounted(() => {
         const target = liveLoudnessContainer.value;
         if (!target) return;
 
-        // Récupérer les positions actuelles
         const x =
           (parseFloat(target.getAttribute("data-x") || "0") || 0) + event.dx;
         const y =
           (parseFloat(target.getAttribute("data-y") || "0") || 0) + event.dy;
 
-        // Appliquer la transformation CSS pour déplacer le conteneur
         target.style.transform = `translate(${x}px, ${y}px)`;
 
-        // Stocker la position pour l'utiliser lors des prochains déplacements
         target.setAttribute("data-x", `${x}`);
         target.setAttribute("data-y", `${y}`);
       },
